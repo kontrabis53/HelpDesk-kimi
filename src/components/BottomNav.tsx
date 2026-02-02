@@ -1,0 +1,55 @@
+import { Home, FileText, Package, BookOpen, User, Shield } from 'lucide-react';
+import { cn } from '@/lib/utils';
+
+interface BottomNavProps {
+  activeTab: 'tickets' | 'documents' | 'inventory' | 'knowledge' | 'profile' | 'admin';
+  onTabChange: (tab: 'tickets' | 'documents' | 'inventory' | 'knowledge' | 'profile' | 'admin') => void;
+  availableModules?: string[];
+  canAccessAdmin?: boolean;
+}
+
+export function BottomNav({ activeTab, onTabChange, availableModules = [], canAccessAdmin = false }: BottomNavProps) {
+  const allTabs = [
+    { id: 'knowledge' as const, label: 'База', icon: BookOpen, moduleId: 'knowledge' },
+    { id: 'tickets' as const, label: 'Заявки', icon: Home, moduleId: 'tickets' },
+    { id: 'documents' as const, label: 'Документы', icon: FileText, moduleId: 'documents' },
+    { id: 'inventory' as const, label: 'Склад', icon: Package, moduleId: 'inventory' },
+    { id: 'admin' as const, label: 'Управление', icon: Shield, moduleId: 'admin' },
+    { id: 'profile' as const, label: 'Профиль', icon: User, moduleId: 'profile' },
+  ];
+
+  // Filter tabs based on permissions
+  const visibleTabs = allTabs.filter(tab => {
+    // Profile is always visible
+    if (tab.id === 'profile') return true;
+    // Admin only for admins
+    if (tab.id === 'admin') return canAccessAdmin;
+    // Other modules based on permissions
+    return availableModules.includes(tab.moduleId);
+  });
+
+  return (
+    <nav className="fixed bottom-0 left-0 right-0 bg-white dark:bg-slate-800 border-t border-slate-200 dark:border-slate-700 safe-area-bottom z-50">
+      <div className="flex items-center justify-around h-16 max-w-4xl mx-auto">
+        {visibleTabs.map((tab) => {
+          const Icon = tab.icon;
+          const isActive = activeTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              onClick={() => onTabChange(tab.id)}
+              className={cn(
+                'flex flex-col items-center justify-center flex-1 h-full',
+                'transition-colors duration-200',
+                isActive ? 'text-blue-600 dark:text-blue-400' : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300'
+              )}
+            >
+              <Icon className={cn('w-5 h-5 mb-0.5', isActive && 'stroke-[2.5px]')} />
+              <span className="text-[10px] font-medium">{tab.label}</span>
+            </button>
+          );
+        })}
+      </div>
+    </nav>
+  );
+}
