@@ -1,6 +1,6 @@
 import { useState, useCallback, useMemo } from 'react';
-import type { Ticket, TicketStatus, TicketFilter, TicketPriority, TicketCategory } from '@/types';
-import { mockTickets, currentUser } from '@/data/mock';
+import type { Ticket, TicketStatus, TicketFilter, TicketPriority, TicketCategory, User } from '@/types';
+import { mockTickets, currentUser, users } from '@/data/mock';
 
 export function useTickets() {
   const [tickets, setTickets] = useState<Ticket[]>(mockTickets);
@@ -73,18 +73,34 @@ export function useTickets() {
     }));
   }, []);
 
-  const assignTicket = useCallback((ticketId: string, _assigneeId: string) => {
+  const assignTicket = useCallback((ticketId: string, assigneeId: string) => {
     setTickets(prev => prev.map(ticket => {
       if (ticket.id === ticketId) {
+        if (!assigneeId) {
+          // Снять назначение
+          return {
+            ...ticket,
+            assignee: undefined,
+            updatedAt: new Date().toISOString(),
+          };
+        }
+        
+        const assignee = users.find(u => u.id === assigneeId);
+        if (!assignee) return ticket;
+        
         return {
           ...ticket,
-          assignee: currentUser,
+          assignee,
           status: ticket.status === 'new' ? 'in_progress' : ticket.status,
           updatedAt: new Date().toISOString(),
         };
       }
       return ticket;
     }));
+  }, []);
+
+  const getAvailableAssignees = useCallback((): User[] => {
+    return users.filter(u => u.role === 'technician' || u.role === 'admin');
   }, []);
 
   const addComment = useCallback((ticketId: string, text: string) => {
@@ -108,6 +124,28 @@ export function useTickets() {
     }));
   }, []);
 
+  const updateTicket = useCallback((ticketId: string, data: {
+    title?: string;
+    description?: string;
+    category?: TicketCategory;
+    priority?: TicketPriority;
+  }) => {
+    setTickets(prev => prev.map(ticket => {
+      if (ticket.id === ticketId) {
+        return {
+          ...ticket,
+          ...data,
+          updatedAt: new Date().toISOString(),
+        };
+      }
+      return ticket;
+    }));
+  }, []);
+
+  const deleteTicket = useCallback((ticketId: string) => {
+    setTickets(prev => prev.filter(ticket => ticket.id !== ticketId));
+  }, []);
+
   const getStats = useMemo(() => {
     return {
       total: tickets.length,
@@ -125,9 +163,12 @@ export function useTickets() {
     setFilter,
     getTicketById,
     createTicket,
+    updateTicket,
     updateTicketStatus,
     assignTicket,
+    getAvailableAssignees,
     addComment,
+    deleteTicket,
     stats: getStats,
   };
 }

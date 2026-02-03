@@ -10,6 +10,7 @@ import { BottomNav } from '@/components/BottomNav';
 import { TicketListScreen } from '@/screens/TicketListScreen';
 import { TicketDetailScreen } from '@/screens/TicketDetailScreen';
 import { CreateTicketScreen } from '@/screens/CreateTicketScreen';
+import { EditTicketScreen } from '@/screens/EditTicketScreen';
 import { DocumentsScreen } from '@/screens/DocumentsScreen';
 import { CreateDocumentScreen } from '@/screens/CreateDocumentScreen';
 import { InventoryScreen } from '@/screens/InventoryScreen';
@@ -24,7 +25,7 @@ import { toast } from 'sonner';
 import './App.css';
 
 type ScreenType = 'tickets' | 'documents' | 'inventory' | 'knowledge' | 'profile' | 'admin' | 'settings' |
-                  'ticket_detail' | 'create_ticket' | 'document_detail' | 
+                  'ticket_detail' | 'create_ticket' | 'edit_ticket' | 'document_detail' | 
                   'create_document' | 'inventory_detail' | 'create_inventory' |
                   'guide_detail';
 
@@ -57,8 +58,12 @@ function App() {
     tickets, 
     ticketsByStatus, 
     getTicketById,
-    createTicket, 
-    updateTicketStatus, 
+    createTicket,
+    updateTicket,
+    updateTicketStatus,
+    assignTicket,
+    getAvailableAssignees,
+    deleteTicket,
     addComment,
     setFilter: setTicketFilter,
     stats: ticketStats 
@@ -102,7 +107,9 @@ function App() {
   };
 
   const handleBack = () => {
-    if (selectedTicket) {
+    if (currentScreen === 'edit_ticket' && selectedTicket) {
+      setCurrentScreen('ticket_detail');
+    } else if (selectedTicket) {
       setCurrentScreen('tickets');
       setSelectedTicket(null);
     } else if (selectedGuide) {
@@ -157,12 +164,66 @@ function App() {
     if (updatedTicket) setSelectedTicket(updatedTicket);
   };
 
+  const handleAssignTicket = (ticketId: string, assigneeId: string) => {
+    if (!assigneeId) {
+      // Снять назначение
+      assignTicket(ticketId, '');
+      addLog('ticket.unassigned', 'ticket', ticketId, undefined, 'Исполнитель снят');
+      toast.success('Исполнитель снят');
+    } else {
+      assignTicket(ticketId, assigneeId);
+      const assignee = getAvailableAssignees().find(u => u.id === assigneeId);
+      addLog('ticket.assigned', 'ticket', ticketId, undefined, `Назначен исполнитель: ${assignee?.name}`);
+      toast.success('Исполнитель назначен', {
+        description: assignee ? `${assignee.name} назначен исполнителем` : undefined,
+      });
+    }
+    const updatedTicket = getTicketById(ticketId);
+    if (updatedTicket) setSelectedTicket(updatedTicket);
+  };
+
   const handleAddComment = (ticketId: string, text: string) => {
     addComment(ticketId, text);
     addLog('ticket.comment_added', 'ticket', ticketId, undefined, 'Добавлен комментарий');
     toast.success('Комментарий добавлен');
     const updatedTicket = getTicketById(ticketId);
     if (updatedTicket) setSelectedTicket(updatedTicket);
+  };
+
+  const handleEditTicket = () => {
+    if (!selectedTicket) return;
+    if (!hasPermission('tickets', 'edit')) {
+      toast.error('Нет прав', { description: 'У вас нет прав для редактирования заявок' });
+      return;
+    }
+    setCurrentScreen('edit_ticket');
+  };
+
+  const handleUpdateTicket = (ticketId: string, data: {
+    title: string;
+    description: string;
+    category: import('@/types').TicketCategory;
+    priority: import('@/types').TicketPriority;
+  }) => {
+    updateTicket(ticketId, data);
+    addLog('ticket.updated', 'ticket', ticketId, undefined, `Заявка обновлена: ${data.title}`);
+    toast.success('Заявка обновлена', {
+      description: 'Изменения успешно сохранены',
+    });
+    const updatedTicket = getTicketById(ticketId);
+    if (updatedTicket) {
+      setSelectedTicket(updatedTicket);
+      setCurrentScreen('ticket_detail');
+    }
+  };
+
+  const handleDeleteTicket = (ticketId: string) => {
+    const ticket = getTicketById(ticketId);
+    deleteTicket(ticketId);
+    addLog('ticket.deleted', 'ticket', ticketId, ticket?.number, `Удалена заявка: ${ticket?.title}`);
+    toast.success('Заявка удалена');
+    setCurrentScreen('tickets');
+    setSelectedTicket(null);
   };
 
   // Document handlers
@@ -261,6 +322,19 @@ function App() {
             onBack={handleBack}
             onStatusChange={handleStatusChange}
             onAddComment={handleAddComment}
+            onEdit={handleEditTicket}
+            onAssign={handleAssignTicket}
+            availableAssignees={getAvailableAssignees()}
+          />
+        );
+      case 'edit_ticket':
+        if (!selectedTicket) return null;
+        return (
+          <EditTicketScreen
+            ticket={selectedTicket}
+            onBack={handleBack}
+            onUpdate={handleUpdateTicket}
+            onDelete={handleDeleteTicket}
           />
         );
       case 'create_ticket':
@@ -371,7 +445,7 @@ function App() {
   };
 
   const getActiveTab = (): 'tickets' | 'documents' | 'inventory' | 'knowledge' | 'profile' | 'admin' => {
-    if (currentScreen === 'ticket_detail' || currentScreen === 'create_ticket') return 'tickets';
+    if (currentScreen === 'ticket_detail' || currentScreen === 'create_ticket' || currentScreen === 'edit_ticket') return 'tickets';
     if (currentScreen === 'document_detail' || currentScreen === 'create_document') return 'documents';
     if (currentScreen === 'inventory_detail' || currentScreen === 'create_inventory') return 'inventory';
     if (currentScreen === 'guide_detail') return 'knowledge';
@@ -381,7 +455,7 @@ function App() {
     return 'knowledge';
   };
 
-  const showBottomNav = !['ticket_detail', 'create_ticket', 'create_document', 'create_inventory', 'guide_detail', 'settings'].includes(currentScreen);
+  const showBottomNav = !['ticket_detail', 'create_ticket', 'edit_ticket', 'create_document', 'create_inventory', 'guide_detail', 'settings'].includes(currentScreen);
 
   return (
     <div className="w-full min-h-screen bg-white dark:bg-slate-950 relative">

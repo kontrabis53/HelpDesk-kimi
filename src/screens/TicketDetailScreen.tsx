@@ -1,22 +1,31 @@
 import { useState } from 'react';
-import type { Ticket, TicketStatus } from '@/types';
+import type { Ticket, TicketStatus, User } from '@/types';
 import { StatusBadge } from '@/components/StatusBadge';
 import { PriorityIndicator } from '@/components/PriorityIndicator';
 import { categoryLabels, priorityLabels } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { 
   ArrowLeft, 
   Calendar, 
-  User, 
+  User as UserIcon, 
   Tag, 
   MessageSquare, 
   Play, 
   CheckCircle, 
   Clock,
   XCircle,
-  Send
+  Send,
+  Edit
 } from 'lucide-react';
+import { Label } from '@/components/ui/label';
 
 
 interface TicketDetailScreenProps {
@@ -24,13 +33,19 @@ interface TicketDetailScreenProps {
   onBack: () => void;
   onStatusChange: (ticketId: string, status: TicketStatus) => void;
   onAddComment: (ticketId: string, text: string) => void;
+  onEdit?: () => void;
+  onAssign?: (ticketId: string, assigneeId: string) => void;
+  availableAssignees?: User[];
 }
 
 export function TicketDetailScreen({ 
   ticket, 
   onBack, 
   onStatusChange,
-  onAddComment 
+  onAddComment,
+  onEdit,
+  onAssign,
+  availableAssignees = []
 }: TicketDetailScreenProps) {
   const [commentText, setCommentText] = useState('');
 
@@ -125,6 +140,15 @@ export function TicketDetailScreen({
           <h1 className="text-lg font-semibold text-slate-800 dark:text-slate-100">{ticket.number}</h1>
         </div>
         <StatusBadge status={ticket.status} />
+        {onEdit && (
+          <button
+            onClick={onEdit}
+            className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-full transition-colors"
+            title="Редактировать"
+          >
+            <Edit className="w-5 h-5 text-slate-600 dark:text-slate-300" />
+          </button>
+        )}
       </div>
 
       <div className="p-4 space-y-4 max-w-2xl mx-auto">
@@ -152,17 +176,38 @@ export function TicketDetailScreen({
               <span className="font-medium text-slate-700 dark:text-slate-200">{formatDate(ticket.createdAt)}</span>
             </div>
             <div className="flex items-center gap-2">
-              <User className="w-4 h-4 text-slate-400" />
+              <UserIcon className="w-4 h-4 text-slate-400" />
               <span className="text-slate-500 dark:text-slate-400">Автор:</span>
               <span className="font-medium text-slate-700 dark:text-slate-200">{ticket.author.name}</span>
             </div>
           </div>
 
-          {ticket.assignee && (
-            <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-700 flex items-center gap-2">
-              <User className="w-4 h-4 text-slate-400" />
-              <span className="text-slate-500 dark:text-slate-400">Исполнитель:</span>
-              <span className="font-medium text-blue-600 dark:text-blue-400">{ticket.assignee.name}</span>
+          {onAssign && availableAssignees.length > 0 && (
+            <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-700 space-y-2">
+              <Label className="text-sm text-slate-500 dark:text-slate-400 flex items-center gap-2">
+                <UserIcon className="w-4 h-4" />
+                {ticket.assignee ? 'Исполнитель:' : 'Назначить исполнителя:'}
+              </Label>
+              <div className="flex gap-2">
+                <Select
+                  value={ticket.assignee?.id || ''}
+                  onValueChange={(value) => {
+                    onAssign(ticket.id, value || '');
+                  }}
+                >
+                  <SelectTrigger className="flex-1 dark:bg-slate-700 dark:border-slate-600">
+                    <SelectValue placeholder="Выберите исполнителя" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">Не назначен</SelectItem>
+                    {availableAssignees.map((user) => (
+                      <SelectItem key={user.id} value={user.id}>
+                        {user.name} ({user.department})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           )}
         </div>
